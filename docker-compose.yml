@@ -2,18 +2,22 @@ services:
   mlflow:
     build: .
     container_name: mlflow
-    command: >
-      sh -c "mkdir -p /mlflow/artifacts &&
-             mlflow server
-             --backend-store-uri sqlite:////mlflow/mlflow.db
-             --default-artifact-root /mlflow/artifacts
-             --serve-artifacts
-             --host 0.0.0.0
-             --port 5000"
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /mlflow/artifacts
+        mlflow server \
+          --backend-store-uri sqlite:////mlflow/mlflow.db \
+          --default-artifact-root /mlflow/artifacts \
+          --serve-artifacts \
+          --host 0.0.0.0 \
+          --port 5000 \
+          --allowed-hosts "*"
     ports:
       - "5000:5000"
     volumes:
-      - ./mlruns_docker:/mlflow
+      - mlflow_data:/mlflow
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/"]
       interval: 10s
@@ -30,6 +34,7 @@ services:
         condition: service_healthy
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_ARTIFACT_URI: http://mlflow:5000
       MODEL_NAME: diabetes-readmission-xgboost
       MODEL_STAGE: Production
       N_TRIALS: ${N_TRIALS:-2}
@@ -41,6 +46,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - mlflow_data:/mlflow
 
   api:
     build: .
@@ -55,6 +61,7 @@ services:
         condition: service_completed_successfully
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_ARTIFACT_URI: http://mlflow:5000
       MODEL_NAME: diabetes-readmission-xgboost
       MODEL_STAGE: Production
       DECISION_THRESHOLD: ${DECISION_THRESHOLD:-0.3}
@@ -62,3 +69,7 @@ services:
       MLFLOW_WAIT_INTERVAL: 5
     volumes:
       - ./data:/app/data:ro
+      - mlflow_data:/mlflow
+
+volumes:
+  mlflow_data:
